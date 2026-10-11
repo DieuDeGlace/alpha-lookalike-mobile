@@ -1,22 +1,37 @@
 #pragma once
+#include "MobileBuild.h"
 #include "cube/Game.h"
 #include "gfx/ChunkBuffer.h"
 #include "gfx/D3D11VertexBuffer.h"
 #include <unordered_map>
 #include <cmath>
 namespace nativeScene {
+// The executable is immutable during a process. Validate its identity once,
+// rather than repeating PE-header inspection in scene/terrain queries.
+inline unsigned char *executableBase() {
+    static auto *base = reinterpret_cast<unsigned char *>(GetModuleHandleW(nullptr));
+    return base;
+}
 inline bool supported() {
-    auto base = (unsigned char *)GetModuleHandleW(nullptr);
-    auto dos = (IMAGE_DOS_HEADER *)base;
-    if (dos->e_magic != IMAGE_DOS_SIGNATURE)
-        return false;
-    auto nt = (IMAGE_NT_HEADERS64 *)(base + dos->e_lfanew);
-    return nt->Signature == IMAGE_NT_SIGNATURE && nt->FileHeader.TimeDateStamp == 0x5d93ab0d &&
-           nt->OptionalHeader.SizeOfImage == 0x5b7000;
+    static const bool matchesMobileBuild = [] {
+        const auto *base = executableBase();
+        if (!base)
+            return false;
+        const auto *dos = reinterpret_cast<const IMAGE_DOS_HEADER *>(base);
+        if (dos->e_magic != IMAGE_DOS_SIGNATURE)
+            return false;
+        const auto *nt = reinterpret_cast<const IMAGE_NT_HEADERS64 *>(base + dos->e_lfanew);
+        return nt->Signature == IMAGE_NT_SIGNATURE &&
+               nt->FileHeader.TimeDateStamp == mobileBuild::timestamp &&
+               nt->OptionalHeader.SizeOfImage == mobileBuild::imageSize;
+    }();
+    return matchesMobileBuild;
 }
 inline cube::Game *game() {
-    return supported() ? *(cube::Game **)((unsigned char *)GetModuleHandleW(nullptr) + 0x551a80)
-                       : nullptr;
+    // Read the game pointer each time; it may change when a world reloads.
+    return supported()
+               ? *reinterpret_cast<cube::Game **>(executableBase() + mobileBuild::gamePointerRva)
+               : nullptr;
 }
 inline bool cloud(cube::World *world, ID3D11Buffer *buffer) {
     if (!world || !world->spritemanager || !buffer)
@@ -123,3 +138,4 @@ inline int blockType(cube::Zone *zone, int x, int y, int z) {
     return index >= 0 && size_t(index) < field.blocks.size() ? int(field.blocks[index].type) : 0;
 }
 } // namespace nativeScene
+
