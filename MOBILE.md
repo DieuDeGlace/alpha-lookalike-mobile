@@ -13,3 +13,8 @@ Merged upstream alpha-lookalike `fix/fog-msaa-depth`. That brings Alpha/Omega-st
 The fog now reads MSAA depth, sample 0, through an `MSAA_DEPTH` shader variant. It reads the depth in place when the depth is shader-readable, which TemporalAA's `ReadableDepth` hook provides on the phone; otherwise it copies the depth.
 
 `MobileBuild.h` and the phone-only identity check are kept. PaletteTest passes, including both 4x MSAA fog paths.
+
+
+## Rendering performance sync — 2026-10-15
+
+Applied directly to mobile main from desktop `dab92fe240da33cfe1f3849804a7a6466b4e924a`. Ports depth-backed world-camera capture and exact clear-depth sky classification. Valid distant geometry receives fog; sky and HUD remain excluded. Current-frame culling is reset before scene capture. The mobile executable identity guard, cached validation and mobile configuration presets are retained. Builds remain Windows x64 DLLs for GameNative, not Android shared libraries. Desktop CPU/GPU fixture results are not phone performance measurements. Preserve existing phone INIs when installing. PC regression checks and phone deployment verification are recorded with the release artifacts; gameplay performance/visual confirmation remains required.
